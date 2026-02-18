@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	bootstraplog "go.dfds.cloud/bootstrap/log"
 	"go.dfds.cloud/copilot-premium-usage-exporter/internal"
 	"go.dfds.cloud/copilot-premium-usage-exporter/internal/config"
 	"go.dfds.cloud/copilot-premium-usage-exporter/internal/github"
@@ -18,11 +19,13 @@ import (
 var logger *zap.Logger
 
 func main() {
-	var err error
-	logger, err = zap.NewProduction()
+	conf, err := config.Load()
 	if err != nil {
 		panic(err)
 	}
+
+	bootstraplog.InitializeLogger(conf.LogDebug, conf.LogLevel)
+	logger = bootstraplog.Logger
 	defer logger.Sync()
 
 	logger.Info("starting copilot-premium-usage-exporter")
@@ -31,19 +34,14 @@ func main() {
 	app.Use(pprof.New())
 	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
 
-	go worker()
+	go worker(conf)
 
 	if err := app.Listen(":8080"); err != nil {
 		panic(err)
 	}
 }
 
-func worker() {
-	conf, err := config.Load()
-	if err != nil {
-		logger.Fatal("failed to load config", zap.Error(err))
-	}
-
+func worker(conf config.Config) {
 	sleepInterval := time.Duration(conf.WorkerInterval) * time.Second
 	client := github.NewClient(conf.Github.Token, logger)
 
