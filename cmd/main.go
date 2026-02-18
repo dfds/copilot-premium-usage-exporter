@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gofiber/adaptor/v2"
@@ -17,6 +19,14 @@ import (
 )
 
 var logger *zap.Logger
+var collectMu sync.RWMutex
+
+type metricEntry struct {
+	labels         prometheus.Labels
+	grossQuantity  float64
+	grossAmount    float64
+	discountAmount float64
+}
 
 func main() {
 	conf, err := config.Load()
@@ -32,7 +42,12 @@ func main() {
 
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	app.Use(pprof.New())
-	app.Get("/metrics", adaptor.HTTPHandler(promhttp.Handler()))
+	metricsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		collectMu.RLock()
+		defer collectMu.RUnlock()
+		promhttp.Handler().ServeHTTP(w, r)
+	})
+	app.Get("/metrics", adaptor.HTTPHandler(metricsHandler))
 
 	go worker(conf)
 
@@ -66,10 +81,7 @@ func collect(client *github.Client, enterprise string) error {
 
 	logger.Info("found copilot seat holders", zap.Int("count", len(logins)))
 
-	internal.RequestAmount.Reset()
-	internal.RequestCostGross.Reset()
-	internal.RequestCostDiscount.Reset()
-
+	var entries []metricEntry
 	for _, login := range logins {
 		usage, err := client.GetUserPremiumUsage(enterprise, login)
 		if err != nil {
@@ -78,16 +90,31 @@ func collect(client *github.Client, enterprise string) error {
 		}
 
 		for _, item := range usage.UsageItems {
-			lbls := prometheus.Labels{
-				"user":       login,
-				"sku":        item.SKU,
-				"model":      item.Model,
-				"enterprise": enterprise,
-			}
-			internal.RequestAmount.With(lbls).Set(item.GrossQuantity)
-			internal.RequestCostGross.With(lbls).Set(item.GrossAmount)
-			internal.RequestCostDiscount.With(lbls).Set(item.DiscountAmount)
+			entries = append(entries, metricEntry{
+				labels: prometheus.Labels{
+					"user":       login,
+					"sku":        item.SKU,
+					"model":      item.Model,
+					"enterprise": enterprise,
+				},
+				grossQuantity:  item.GrossQuantity,
+				grossAmount:    item.GrossAmount,
+				discountAmount: item.DiscountAmount,
+			})
 		}
+	}
+
+	collectMu.Lock()
+	defer collectMu.Unlock()
+
+	internal.RequestAmount.Reset()
+	internal.RequestCostGross.Reset()
+	internal.RequestCostDiscount.Reset()
+
+	for _, e := range entries {
+		internal.RequestAmount.With(e.labels).Set(e.grossQuantity)
+		internal.RequestCostGross.With(e.labels).Set(e.grossAmount)
+		internal.RequestCostDiscount.With(e.labels).Set(e.discountAmount)
 	}
 
 	return nil
