@@ -1,0 +1,55 @@
+# Default values for copilot-premium-usage-exporter.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+managedByHelm: true
+environment: "develop"
+
+image:
+  repository: dfdsdk/copilot-premium-usage-exporter
+  pullPolicy: Always
+  tag: "latest"
+
+app:
+  config:
+    secretRef: copilot-premium-usage-exporter
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  awsRoleArn: ""
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  metricsPort: 8080
+  scrapeMetrics: true
+
+resources:
+  requests:
+    memory: "50Mi"
+    cpu: "50m"
+  limits:
+    memory: "200Mi"
+    cpu: "200m"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
