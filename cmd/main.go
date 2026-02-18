@@ -45,7 +45,7 @@ func worker() {
 	}
 
 	sleepInterval := time.Duration(conf.WorkerInterval) * time.Second
-	client := github.NewClient(conf.Github.Token)
+	client := github.NewClient(conf.Github.Token, logger)
 
 	for {
 		logger.Info("collecting copilot premium usage metrics")
