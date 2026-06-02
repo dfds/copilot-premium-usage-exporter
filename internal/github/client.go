@@ -311,6 +311,7 @@ func (c *Client) fetchAICreditCSV(url string) ([]AICreditRow, error) {
 
 	reader := csv.NewReader(resp.Body)
 	reader.FieldsPerRecord = -1 // tolerate trailing-column drift
+	reader.LazyQuotes = true    // GitHub's CSV embeds bare quotes inside model names
 	header, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("reading ai_credit csv header: %w", err)
