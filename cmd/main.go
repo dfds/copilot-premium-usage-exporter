@@ -60,7 +60,7 @@ func main() {
 
 	go worker(conf)
 
-	if err := app.Listen(":8089"); err != nil {
+	if err := app.Listen(":8080"); err != nil {
 		panic(err)
 	}
 }
