@@ -211,9 +211,15 @@ func (c *Client) CreateAndAwaitBillingReport(enterprise, reportType, startDate, 
 	)
 
 	for attempt := range reportPollMaxAttempts {
-		st, err := c.getBillingReport(enterprise, id)
+		st, notFound, err := c.getBillingReport(enterprise, id)
 		if err != nil {
 			return nil, err
+		}
+		if notFound {
+			// GitHub's POST-create and GET-read paths are eventually consistent;
+			// the freshly-issued ID can 404 for the first few polls.
+			time.Sleep(reportPollInterval)
+			continue
 		}
 		switch st.Status {
 		case "completed":
