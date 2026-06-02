@@ -1,34 +1,56 @@
 package github
 
-type SeatsResponse struct {
-	TotalSeats int           `json:"total_seats"`
-	Seats      []CopilotSeat `json:"seats"`
+type BillingUsageResponse struct {
+	UsageItems []BillingUsageItem `json:"usageItems"`
 }
 
-type CopilotSeat struct {
-	Assignee Assignee `json:"assignee"`
-}
-
-type Assignee struct {
-	Login string `json:"login"`
-}
-
-type UsageResponse struct {
-	Enterprise string      `json:"enterprise"`
-	User       string      `json:"user"`
-	UsageItems []UsageItem `json:"usageItems"`
-}
-
-type UsageItem struct {
+type BillingUsageItem struct {
+	Date             string  `json:"date"`
 	Product          string  `json:"product"`
 	SKU              string  `json:"sku"`
-	Model            string  `json:"model"`
+	Quantity         float64 `json:"quantity"`
 	UnitType         string  `json:"unitType"`
 	PricePerUnit     float64 `json:"pricePerUnit"`
-	GrossQuantity    float64 `json:"grossQuantity"`
 	GrossAmount      float64 `json:"grossAmount"`
-	DiscountQuantity float64 `json:"discountQuantity"`
 	DiscountAmount   float64 `json:"discountAmount"`
-	NetQuantity      float64 `json:"netQuantity"`
 	NetAmount        float64 `json:"netAmount"`
+	OrganizationName string  `json:"organizationName"`
+	RepositoryName   string  `json:"repositoryName"`
+}
+
+type BillingReportCreateRequest struct {
+	ReportType string `json:"report_type"`
+	StartDate  string `json:"start_date"`
+	EndDate    string `json:"end_date,omitempty"`
+	SendEmail  bool   `json:"send_email"`
+}
+
+type BillingReportStatus struct {
+	ID           string   `json:"id"`
+	ReportType   string   `json:"report_type"`
+	StartDate    string   `json:"start_date"`
+	EndDate      string   `json:"end_date"`
+	Status       string   `json:"status"`
+	DownloadURLs []string `json:"download_urls"`
+	CreatedAt    string   `json:"created_at"`
+	Actor        string   `json:"actor"`
+}
+
+// AICreditRow is one row of the ai_credit CSV report — a per-user × model × day
+// breakdown of AI Credit consumption and cost. The report supersedes the
+// retired premium_request endpoint as of 2026-06-01.
+type AICreditRow struct {
+	Date           string
+	Username       string
+	Product        string
+	SKU            string
+	Model          string
+	Quantity       float64
+	UnitType       string
+	GrossAmount    float64
+	DiscountAmount float64
+	NetAmount      float64
+	Organization   string
+	Repository     string
+	CostCenterName string
 }
