@@ -22,7 +22,7 @@ const rateLimitResetBuffer = 5 * time.Second
 // Async report polling: GitHub's docs suggest 30s; 15s gives faster turnaround
 // when the report completes mid-interval at the cost of a few extra polls.
 const reportPollInterval = 15 * time.Second
-const reportPollMaxAttempts = 80 // ~20 minutes ceiling
+const reportPollMaxAttempts = 160 // ~40 minutes ceiling — month-to-date reports take longer to render than a single day
 
 type Client struct {
 	httpClient         *http.Client
@@ -276,13 +276,24 @@ func (c *Client) createBillingReport(enterprise, reportType, startDate, endDate 
 	return out.ID, nil
 }
 
-func (c *Client) getBillingReport(enterprise, id string) (*BillingReportStatus, error) {
+func (c *Client) getBillingReport(enterprise, id string) (*BillingReportStatus, bool, error) {
 	url := fmt.Sprintf("%s/enterprises/%s/settings/billing/reports/%s", apiBase, enterprise, id)
-	var out BillingReportStatus
-	if err := c.getJSON(url, &out); err != nil {
-		return nil, fmt.Errorf("polling billing report %s: %w", id, err)
+	resp, err := c.do(func() (*http.Request, error) {
+		return http.NewRequest(http.MethodGet, url, nil)
+	}, http.StatusOK, http.StatusNotFound)
+	if err != nil {
+		return nil, false, fmt.Errorf("polling billing report %s: %w", id, err)
 	}
-	return &out, nil
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		io.Copy(io.Discard, resp.Body)
+		return nil, true, nil
+	}
+	var out BillingReportStatus
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, false, fmt.Errorf("decoding billing report %s status: %w", id, err)
+	}
+	return &out, false, nil
 }
 
 // FetchAICreditRows downloads each signed URL produced by an ai_credit billing

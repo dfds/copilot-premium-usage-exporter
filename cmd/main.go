@@ -122,10 +122,21 @@ func collect(client *github.Client, enterprise string, reportLagDays int) error 
 }
 
 func collectUserAICredits(client *github.Client, enterprise string, lagDays int) ([]userEntry, error) {
-	day := time.Now().UTC().AddDate(0, 0, -lagDays).Format("2006-01-02")
-	logger.Info("requesting ai_credit billing report", zap.String("day", day))
+	// Month-to-date window: the 1st of the month containing the most recently
+	// settled day (today - lagDays) through that day. Anchoring the month on
+	// the end day handles the start-of-month case — e.g. on the 1st with
+	// lagDays=1 the window covers the whole previous (now-complete) month until
+	// the new month starts to accrue settled days.
+	end := time.Now().UTC().AddDate(0, 0, -lagDays)
+	start := time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, time.UTC)
+	startDate := start.Format("2006-01-02")
+	endDate := end.Format("2006-01-02")
+	logger.Info("requesting ai_credit billing report",
+		zap.String("start", startDate),
+		zap.String("end", endDate),
+	)
 
-	urls, err := client.CreateAndAwaitBillingReport(enterprise, "ai_credit", day, day)
+	urls, err := client.CreateAndAwaitBillingReport(enterprise, "ai_credit", startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +145,16 @@ func collectUserAICredits(client *github.Client, enterprise string, lagDays int)
 	if err != nil {
 		return nil, fmt.Errorf("downloading ai_credit csv: %w", err)
 	}
-	logger.Info("fetched ai_credit rows", zap.Int("rows", len(rows)), zap.String("day", day))
+	logger.Info("fetched ai_credit rows",
+		zap.Int("rows", len(rows)),
+		zap.String("start", startDate),
+		zap.String("end", endDate),
+	)
 
-	// Same (user, sku, model, org, cost_center) may appear across multiple
-	// rows of one daily report (e.g. one row per repository); aggregate so
-	// Set() doesn't drop earlier values.
+	// One (user, sku, model, org, cost_center) tuple spans many CSV rows across
+	// the month-to-date window (one per day, and per repository within a day);
+	// summing them yields the running month-to-date total per tuple so Set()
+	// writes a single cumulative value instead of dropping earlier rows.
 	type key struct{ user, sku, model, org, costCenter string }
 	agg := make(map[key]*userEntry)
 	for _, r := range rows {

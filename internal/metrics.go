@@ -7,28 +7,29 @@ import (
 
 // Per-user Copilot AI Credit metrics sourced from the asynchronous ai_credit
 // billing report. Premium Request Units were retired 2026-06-01; AI Credits
-// are the replacement billing unit. The report is daily; gauges reflect the
-// most recently fetched day.
+// are the replacement billing unit. The report is requested for a month-to-date
+// window (1st of month through the most recently settled day); gauges hold the
+// running month-to-date total per tuple and step down when the month rolls over.
 var userAICreditLabels = []string{"user", "sku", "model", "organization", "cost_center", "enterprise"}
 
 var UserAICreditQuantity *prometheus.GaugeVec = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "github_copilot_user_ai_credit_quantity",
-	Help: "Copilot AI Credits consumed per user, SKU, model, organization, and cost center for the most recently fetched day",
+	Help: "Copilot AI Credits consumed per user, SKU, model, organization, and cost center, month-to-date",
 }, userAICreditLabels)
 
 var UserAICreditGrossAmount *prometheus.GaugeVec = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "github_copilot_user_ai_credit_gross_amount_usd",
-	Help: "Gross Copilot AI Credit cost in USD per user, SKU, model, organization, and cost center for the most recently fetched day",
+	Help: "Gross Copilot AI Credit cost in USD per user, SKU, model, organization, and cost center, month-to-date",
 }, userAICreditLabels)
 
 var UserAICreditDiscountAmount *prometheus.GaugeVec = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "github_copilot_user_ai_credit_discount_amount_usd",
-	Help: "Discount applied in USD per user, SKU, model, organization, and cost center for the most recently fetched day",
+	Help: "Discount applied in USD per user, SKU, model, organization, and cost center, month-to-date",
 }, userAICreditLabels)
 
 var UserAICreditNetAmount *prometheus.GaugeVec = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "github_copilot_user_ai_credit_net_amount_usd",
-	Help: "Net Copilot AI Credit cost in USD (gross minus discount) per user, SKU, model, organization, and cost center for the most recently fetched day",
+	Help: "Net Copilot AI Credit cost in USD (gross minus discount) per user, SKU, model, organization, and cost center, month-to-date",
 }, userAICreditLabels)
 
 // Enterprise-level Copilot billing metrics sourced from the aggregate
